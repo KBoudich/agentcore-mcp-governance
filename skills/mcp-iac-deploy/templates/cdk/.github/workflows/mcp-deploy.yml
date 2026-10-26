@@ -1,0 +1,93 @@
+# Promotion pipeline for one MCP server: validate -> dev -> stage (LOG_ONLY review) -> prod (ENFORCE).
+# Copy to .github/workflows/ of the owning repo. Requires GitHub environments
+# dev / stage / prod with AWS_DEPLOY_ROLE_ARN vars (OIDC) and required reviewers on prod.
+name: mcp-deploy
+
+on:
+  pull_request:
+    paths: ["infra/**", "mcp-spec.yaml"]
+  push:
+    branches: [main]
+    paths: ["infra/**", "mcp-spec.yaml"]
+  workflow_dispatch:
+    inputs:
+      breakglass_tool:
+        description: "EMERGENCY: tool name to forbid in prod (fast-track, needs prod approval)"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mcp-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PLUGIN_SCRIPTS: tools/mcp-architect/scripts   # vendored copy of the plugin scripts
+  INFRA: infra
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pip install pyyaml
+      - name: Governance gates (G0-G4)
+        run: python3 $PLUGIN_SCRIPTS/validate_spec.py mcp-spec.yaml
+      - name: Drift between spec and generated tool schemas
+        run: |
+          python3 $PLUGIN_SCRIPTS/scaffold_deploy.py mcp-spec.yaml -o /tmp/regen --force
+          diff -u /tmp/regen/config/tools.json $INFRA/config/tools.json
+          diff -ru /tmp/regen/policies $INFRA/policies || {
+            echo "::warning::policies differ from generated defaults — make sure the diff is reviewed by a policy approver"; }
+      - name: Cost envelope
+        run: python3 $PLUGIN_SCRIPTS/cost_model.py mcp-spec.yaml --scale=1,5 >> "$GITHUB_STEP_SUMMARY"
+      - name: Synth
+        working-directory: ${{ env.INFRA }}
+        run: |
+          npm ci
+          pip install -r lambda/interceptor/requirements.txt -t lambda/interceptor/
+          npx tsc --noEmit
+          npx cdk synth -c stage=stage > /dev/null
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    strategy:
+      max-parallel: 1
+      matrix:
+        stage: [dev, stage, prod]
+    environment: ${{ matrix.stage }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Deploy
+        working-directory: ${{ env.INFRA }}
+        run: |
+          npm ci
+          pip install -r lambda/interceptor/requirements.txt -t lambda/interceptor/
+          SHADOW="${{ vars.SHADOW_POLICIES }}"   # policies in LOG_ONLY observation, comma separated
+          if [ -n "${{ inputs.breakglass_tool }}" ]; then
+            cp policies/breakglass/forbid_${{ inputs.breakglass_tool }}.cedar policies/
+          fi
+          npx cdk deploy -c stage=${{ matrix.stage }} -c shadowPolicies="$SHADOW" \
+            --require-approval never --outputs-file outputs.json
+      - name: Smoke test (initialize -> tools/list filtered per role -> one call)
+        working-directory: ${{ env.INFRA }}
+        env:
+          TOKEN_ALLOWED: ${{ secrets.SMOKE_TOKEN_ALLOWED }}
+          TOKEN_DENIED: ${{ secrets.SMOKE_TOKEN_DENIED }}
+        run: python3 tests/smoke.py outputs.json

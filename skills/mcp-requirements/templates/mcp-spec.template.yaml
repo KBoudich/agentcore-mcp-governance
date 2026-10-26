@@ -1,0 +1,87 @@
+# mcp-spec.yaml — single source of truth for one MCP server.
+# Every mcp-architect skill reads and enriches this file. Keep it in the
+# repository of the owning domain team, next to the server code.
+#
+# Validate:  python3 <plugin>/scripts/validate_spec.py mcp-spec.yaml
+# Decide:    python3 <plugin>/scripts/decide.py mcp-spec.yaml > docs/adr-0001-<name>.md
+# Cost:      python3 <plugin>/scripts/cost_model.py mcp-spec.yaml
+# Diagram:   python3 <plugin>/scripts/gen_architecture.py mcp-spec.yaml -o docs/architecture.drawio
+
+spec_version: 1
+
+mcp:
+  name: ""                      # kebab-case, e.g. quality-certificates
+  domain: ""                    # business domain that owns it, e.g. quality
+  purpose: ""                   # one sentence: which business outcome it serves
+  business_owner: ""            # accountable person (name or role mailbox)
+  technical_owner: ""           # engineering owner / team
+  risk_owner: ""                # signs T2/T3 tools; required if any tool >= T2
+  status: draft                 # draft | pilot | production | retired
+
+consumers:                      # who calls it
+  - name: ""                    # e.g. customer-service-agent
+    kind: agent                 # agent | human-client | automation
+    auth: jwt                   # jwt (user-delegated) | sigv4 (machine identity)
+    framework: ""               # e.g. strands, langgraph, claude-code, copilot
+
+context:
+  organisation: ""
+  hosting: aws                  # aws | multi-cloud | on-prem
+  portability_required: false   # true => knocks out AgentCore Gateway as sole plane
+  primary_region: eu-central-1
+  dr_region: ""
+  data_residency: ""            # e.g. EU
+  identity_provider: ""         # e.g. entra-id, cognito, okta, keycloak
+  partition_dimension: none     # none | legal_entity | plant | business_unit | customer
+  partitions: []                # known values, e.g. [VAL-FR, VAL-DE, VAL-BR]
+  isolation_requirement: logical   # logical | contractual | regulatory
+  compliance: []                # e.g. [gdpr, nis2, export-control, sox]
+  user_delegation_to_saas: false   # true if tools act on behalf of users in SaaS (3LO)
+  vendor_mcp_available: false      # a vendor ships an MCP server for the system of record
+  needs_stateful_sessions: false   # elicitation, sampling, long-running jobs
+  other_mcp_servers_on_platform: 0 # servers already behind the shared gateway
+
+volume:                         # drives cost model and quota checks
+  users: 0
+  interactions_per_user_per_day: 0
+  working_days_per_month: 22
+  tool_calls_per_interaction: 0
+  searches_per_interaction: 0
+  policy_checks_per_call: 1
+  egress_gb_per_month: 0
+  peak_tps: 0
+
+systems_of_record:
+  - name: ""                    # e.g. SAP S/4HANA QM
+    location: on-prem           # on-prem | aws | saas
+    interface: ""               # odata | rfc | rest | jdbc | graphql | mcp
+    data_classes: []            # public | internal | confidential | restricted | personal | export-controlled
+
+tools:
+  - name: ""                    # verb_noun, e.g. get_inspection_certificate
+    description: ""             # written for the model: when to use, when not to
+    side_effect: none           # none | reversible | consequential
+    tier: T0                    # T0 | T1 | T2 | T3 (validate_spec.py checks consistency)
+    data_classes: []
+    partition_scoped: false     # must the backend enforce partition (entity/plant) scope?
+    system_of_record: ""        # name from systems_of_record
+    target_type: lambda         # lambda | openapi | mcp_server | runtime | http_passthrough | smithy | api_gateway
+    inputs:
+      - name: ""
+        type: string            # string | integer | number | boolean | enum | date
+        required: true
+        constraints: ""         # pattern, min/max, enum values, max length
+    max_results: 50
+    max_response_kb: 256
+    execution: sync             # sync | async (submit + poll)
+    idempotency: none           # none | key  (required for any write)
+    approval: none              # none | optional | required (required for T3)
+    limits: ""                  # business ceilings, e.g. "amount <= 50000 EUR; own plant only"
+
+operations:
+  availability_slo: 99.5
+  p95_latency_ms: 2000
+  rto_hours: 8
+  rpo_minutes: 60
+  on_call: ""
+  log_retention_days: 400

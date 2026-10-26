@@ -1,0 +1,105 @@
+[
+  {
+    "name": "get_inspection_certificate",
+    "description": "Return the inspection certificate (metadata + signed PDF link) for one delivery item of the caller's legal entity. Use when a customer asks for a certificate for a known order/item. Do not use for bulk export.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "order_number": {
+          "type": "string",
+          "description": "^[0-9]{10}$"
+        },
+        "item_number": {
+          "type": "integer",
+          "description": "1..9999"
+        }
+      },
+      "required": [
+        "order_number",
+        "item_number"
+      ]
+    }
+  },
+  {
+    "name": "list_open_nonconformances",
+    "description": "List open non-conformance reports for one plant of the caller's legal entity, newest first, paginated. Use to triage quality issues.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "plant_code": {
+          "type": "string",
+          "description": "^[A-Z0-9]{4}$"
+        },
+        "page_token": {
+          "type": "string",
+          "description": "opaque, max 256 chars"
+        }
+      },
+      "required": [
+        "plant_code"
+      ]
+    }
+  },
+  {
+    "name": "create_nonconformance_draft",
+    "description": "Create a DRAFT non-conformance report (not released) for a production order. Returns the draft id. A human must review and release it in SAP.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "production_order": {
+          "type": "string",
+          "description": "^[0-9]{12}$"
+        },
+        "defect_code": {
+          "type": "string",
+          "description": "One of: catalog QM-DEFECT-2026"
+        },
+        "description": {
+          "type": "string",
+          "description": "max 2000 chars"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "uuid v4"
+        }
+      },
+      "required": [
+        "production_order",
+        "defect_code",
+        "description",
+        "idempotency_key"
+      ]
+    }
+  },
+  {
+    "name": "request_quality_hold_release",
+    "description": "Propose releasing a quality hold on a batch. Creates an approval request bound to batch, quantity and disposition; the release executes only after a qualified approver signs. Never releases directly.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "batch_id": {
+          "type": "string",
+          "description": "^[A-Z0-9]{10}$"
+        },
+        "disposition": {
+          "type": "string",
+          "description": "One of: release|rework|scrap"
+        },
+        "justification": {
+          "type": "string",
+          "description": "max 1000 chars"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "uuid v4"
+        }
+      },
+      "required": [
+        "batch_id",
+        "disposition",
+        "justification",
+        "idempotency_key"
+      ]
+    }
+  }
+]

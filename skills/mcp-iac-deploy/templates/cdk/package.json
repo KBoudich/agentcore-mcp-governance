@@ -1,0 +1,23 @@
+{
+  "name": "mcp-gateway-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": { "mcp-gateway": "bin/app.ts" },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "synth": "cdk synth",
+    "deploy:dev": "cdk deploy -c stage=dev",
+    "deploy:stage": "cdk deploy -c stage=stage",
+    "deploy:prod": "cdk deploy -c stage=prod"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.1030.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.274.0",
+    "constructs": "^10.4.2"
+  }
+}

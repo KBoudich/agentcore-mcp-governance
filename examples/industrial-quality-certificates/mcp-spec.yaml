@@ -1,0 +1,154 @@
+# Worked example: a Quality-domain MCP server for an industrial manufacturer.
+# Values are illustrative assumptions, not a description of real systems.
+spec_version: 1
+
+mcp:
+  name: quality-certificates
+  domain: quality
+  purpose: Let customer-service and quality agents retrieve inspection certificates and manage non-conformance reports without SAP screen access.
+  business_owner: Head of Quality Systems
+  technical_owner: Quality digital product team
+  risk_owner: Group Quality Director
+  status: draft
+
+consumers:
+  - name: customer-service-agent
+    kind: agent
+    auth: jwt
+    framework: strands
+  - name: quality-engineer-copilot
+    kind: human-client
+    auth: jwt
+    framework: claude-code
+
+context:
+  organisation: Example Manufacturing
+  hosting: aws
+  portability_required: false
+  primary_region: eu-central-1
+  dr_region: eu-west-1
+  data_residency: EU
+  identity_provider: entra-id
+  partition_dimension: legal_entity
+  partitions: [ENTITY-FR, ENTITY-BR, ENTITY-US]   # illustrative codes
+  isolation_requirement: contractual
+  compliance: [gdpr, nis2, export-control]
+  user_delegation_to_saas: false
+  vendor_mcp_available: false
+  needs_stateful_sessions: false
+  other_mcp_servers_on_platform: 2
+
+volume:
+  users: 200
+  interactions_per_user_per_day: 12
+  working_days_per_month: 22
+  tool_calls_per_interaction: 4
+  searches_per_interaction: 1
+  policy_checks_per_call: 1
+  egress_gb_per_month: 120
+  peak_tps: 15
+
+systems_of_record:
+  - name: SAP S/4HANA QM
+    location: on-prem
+    interface: odata
+    data_classes: [confidential]
+  - name: LIMS
+    location: on-prem
+    interface: rest
+    data_classes: [confidential, export-controlled]
+
+tools:
+  - name: get_inspection_certificate
+    description: >-
+      Return the inspection certificate (metadata + signed PDF link) for one
+      delivery item of the caller's legal entity. Use when a customer asks for a certificate
+      for a known order/item. Do not use for bulk export.
+    side_effect: none
+    tier: T1
+    data_classes: [confidential]
+    partition_scoped: true
+    system_of_record: LIMS
+    target_type: lambda
+    inputs:
+      - {name: order_number, type: string, required: true, constraints: "^[0-9]{10}$"}
+      - {name: item_number, type: integer, required: true, constraints: "1..9999"}
+    max_results: 1
+    max_response_kb: 64
+    execution: sync
+    idempotency: none
+    approval: none
+    limits: "own legal entity only; 30 calls/user/hour"
+
+  - name: list_open_nonconformances
+    description: >-
+      List open non-conformance reports for one plant of the caller's legal entity,
+      newest first, paginated. Use to triage quality issues.
+    side_effect: none
+    tier: T1
+    data_classes: [confidential]
+    partition_scoped: true
+    system_of_record: SAP S/4HANA QM
+    target_type: lambda
+    inputs:
+      - {name: plant_code, type: string, required: true, constraints: "^[A-Z0-9]{4}$"}
+      - {name: page_token, type: string, required: false, constraints: "opaque, max 256 chars"}
+    max_results: 25
+    max_response_kb: 128
+    execution: sync
+    idempotency: none
+    approval: none
+    limits: "plants in caller's entity only"
+
+  - name: create_nonconformance_draft
+    description: >-
+      Create a DRAFT non-conformance report (not released) for a production order.
+      Returns the draft id. A human must review and release it in SAP.
+    side_effect: reversible
+    tier: T2
+    data_classes: [confidential]
+    partition_scoped: true
+    system_of_record: SAP S/4HANA QM
+    target_type: lambda
+    inputs:
+      - {name: production_order, type: string, required: true, constraints: "^[0-9]{12}$"}
+      - {name: defect_code, type: enum, required: true, constraints: "catalog QM-DEFECT-2026"}
+      - {name: description, type: string, required: true, constraints: "max 2000 chars"}
+      - {name: idempotency_key, type: string, required: true, constraints: "uuid v4"}
+    max_results: 1
+    max_response_kb: 16
+    execution: sync
+    idempotency: key
+    approval: optional
+    limits: "max 20 drafts/user/day; own plant only"
+
+  - name: request_quality_hold_release
+    description: >-
+      Propose releasing a quality hold on a batch. Creates an approval request bound to
+      batch, quantity and disposition; the release executes only after a qualified
+      approver signs. Never releases directly.
+    side_effect: consequential
+    tier: T3
+    data_classes: [confidential]
+    partition_scoped: true
+    system_of_record: SAP S/4HANA QM
+    target_type: lambda
+    inputs:
+      - {name: batch_id, type: string, required: true, constraints: "^[A-Z0-9]{10}$"}
+      - {name: disposition, type: enum, required: true, constraints: "release|rework|scrap"}
+      - {name: justification, type: string, required: true, constraints: "max 1000 chars"}
+      - {name: idempotency_key, type: string, required: true, constraints: "uuid v4"}
+    max_results: 1
+    max_response_kb: 16
+    execution: async
+    idempotency: key
+    approval: required
+    limits: "approver must hold QM-RELEASE role for the plant; 4-eyes; expires after 24 h"
+
+operations:
+  availability_slo: 99.5
+  p95_latency_ms: 2500
+  rto_hours: 8
+  rpo_minutes: 60
+  on_call: quality-digital-oncall
+  log_retention_days: 400

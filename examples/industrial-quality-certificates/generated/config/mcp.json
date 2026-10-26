@@ -1,0 +1,16 @@
+{
+  "name": "quality-certificates",
+  "domain": "quality",
+  "targetName": "QualityCertificatesTools",
+  "region": "eu-central-1",
+  "partitionClaim": "legal_entity",
+  "discoveryUrl": "https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/openid-configuration",
+  "allowedAudience": [
+    "api://mcp-quality-certificates"
+  ],
+  "tags": {
+    "mcp:name": "quality-certificates",
+    "mcp:domain": "quality",
+    "cost-center": "unassigned"
+  }
+}

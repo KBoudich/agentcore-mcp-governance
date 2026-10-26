@@ -1,0 +1,55 @@
+{
+  "_about": "Rates and quotas read from official AWS AgentCore pages on 2026-10-21. They change: re-verify before budgeting or capacity commitments. Region coverage for Policy is a third-party snapshot (July 2026) — confirm on the official supported-Regions page.",
+  "verified_on": "2026-10-21",
+  "sources": {
+    "pricing": "https://aws.amazon.com/bedrock/agentcore/pricing/",
+    "quotas": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/bedrock-agentcore-limits.html",
+    "regions": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-regions.html",
+    "vpc_egress": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-vpc-egress.html",
+    "policy": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html"
+  },
+  "pricing_usd": {
+    "gateway_invocation_per_million": 5.0,
+    "search_per_million": 25.0,
+    "tool_indexing_per_100_tools_month": 0.02,
+    "vpc_egress_per_gb": 0.006,
+    "policy_authorization_per_request": 0.000025,
+    "policy_nl_authoring_per_1k_input_tokens": 0.13,
+    "identity_via_gateway": 0.0
+  },
+  "quotas": {
+    "gateways_per_account": 1000,
+    "targets_per_gateway": 100,
+    "tools_per_target": 1000,
+    "invocation_timeout_minutes": 15,
+    "inline_schema_mb": 1,
+    "s3_schema_mb": 10,
+    "tool_call_tps_gateway": 200,
+    "tool_call_tps_account": 200,
+    "concurrent_connections": 5000,
+    "search_calls_per_minute": 25,
+    "max_payload_mb": 6,
+    "control_plane_tps": 5,
+    "session_timeout_hours_default": 1,
+    "session_timeout_hours_max": 8,
+    "tool_name_max_chars": 256,
+    "policy_engines_per_account": 1000,
+    "policies_per_engine": 1000,
+    "temporal_policies_per_engine": 20,
+    "cedar_schema_kb_per_engine": 400
+  },
+  "regions": {
+    "policy_reported": ["us-east-1", "us-west-2", "eu-central-1", "ap-southeast-2"],
+    "gateway_ga": ["us-east-1", "us-east-2", "us-west-2", "eu-central-1", "eu-west-1", "ap-south-1", "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "sa-east-1"],
+    "gateway_without_policy_reported": ["eu-west-3", "eu-north-1", "eu-west-2", "ap-northeast-2", "ca-central-1"]
+  },
+  "target_constraints": {
+    "smithy": {"private_endpoint": false, "note": "No privateEndpoint; open a Support case for private connectivity."},
+    "api_gateway": {"private_endpoint": false, "note": "Regional REST only; private APIs not supported as targets — export as OpenAPI target with routingDomain instead. No OAuth outbound, no cross-account."},
+    "openapi": {"private_endpoint": true, "note": "privateEndpoint via VPC Lattice covers one domain; multi-domain needs Support (privateEndpointOverrides)."},
+    "mcp_server": {"private_endpoint": true, "note": "Supports 3LO, elicitation, sampling, streaming. Inventory prompts/resources: Policy evaluates MCP tools only."},
+    "lambda": {"private_endpoint": true, "note": "Reach VPC resources with a VPC-attached function; you author the tool schema."},
+    "runtime": {"private_endpoint": true, "note": "Backbone; ensure the Runtime accepts only gateway-originated calls. Verify policy applicability for the route."},
+    "http_passthrough": {"private_endpoint": true, "note": "No protocol translation; provide an API schema to enable policy/guardrail features; verify policy coverage."}
+  }
+}
