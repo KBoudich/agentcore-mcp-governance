@@ -1,0 +1,10 @@
+# Every server has its domain team as owner; governance files need the platform team.
+# Replace the example handles with your organisation's teams.
+
+*                        @your-org/mcp-platform
+/vendor/                 @your-org/mcp-platform
+/.github/                @your-org/mcp-platform
+/CATALOG.md              @your-org/mcp-platform
+
+# One line per server, added with the server:
+# /servers/quality-certificates/   @your-org/quality-digital @your-org/mcp-platform

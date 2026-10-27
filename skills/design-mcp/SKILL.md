@@ -17,6 +17,8 @@ Work through the stages in order. At each stage, use the named skill, produce it
 6. **mcp-iac-deploy** → `infra/` via `<plugin>/scripts/scaffold_deploy.py`; typecheck and synth (gate G5).
 7. **mcp-operations** → go-live checklist, runbooks, acceptance tests (gate G6).
 
+In a central MCP monorepo, work in `servers/<name>/` and finish with the **mcp-repo-compliance** skill before opening the pull request.
+
 Keep `mcp-spec.yaml` as the single source of truth: change the spec, then regenerate. Label every statement about AWS behaviour that you have not verified in current AWS documentation as a verification gate.
 
 Finish with an independent review using the **mcp-governance-review** skill, and summarise its verdict. Where the agent can run a separate reviewer (a Claude Code subagent, a fresh Codex or Copilot session), run the review there so the author does not grade their own design.

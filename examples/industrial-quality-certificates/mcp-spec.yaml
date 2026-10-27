@@ -5,7 +5,7 @@ spec_version: 1
 mcp:
   name: quality-certificates
   domain: quality
-  purpose: Let customer-service and quality agents retrieve inspection certificates and manage non-conformance reports without SAP screen access.
+  purpose: Let customer-service and quality agents retrieve inspection certificates and manage non-conformance reports without direct access to the business systems.
   business_owner: Head of Quality Systems
   technical_owner: Quality digital product team
   risk_owner: Group Quality Director
@@ -49,9 +49,9 @@ volume:
   peak_tps: 15
 
 systems_of_record:
-  - name: SAP S/4HANA QM
+  - name: ERP quality module
     location: on-prem
-    interface: odata
+    interface: rest
     data_classes: [confidential]
   - name: LIMS
     location: on-prem
@@ -88,7 +88,7 @@ tools:
     tier: T1
     data_classes: [confidential]
     partition_scoped: true
-    system_of_record: SAP S/4HANA QM
+    system_of_record: ERP quality module
     target_type: lambda
     inputs:
       - {name: plant_code, type: string, required: true, constraints: "^[A-Z0-9]{4}$"}
@@ -103,12 +103,12 @@ tools:
   - name: create_nonconformance_draft
     description: >-
       Create a DRAFT non-conformance report (not released) for a production order.
-      Returns the draft id. A human must review and release it in SAP.
+      Returns the draft id. A human must review and release it in the ERP.
     side_effect: reversible
     tier: T2
     data_classes: [confidential]
     partition_scoped: true
-    system_of_record: SAP S/4HANA QM
+    system_of_record: ERP quality module
     target_type: lambda
     inputs:
       - {name: production_order, type: string, required: true, constraints: "^[0-9]{12}$"}
@@ -131,7 +131,7 @@ tools:
     tier: T3
     data_classes: [confidential]
     partition_scoped: true
-    system_of_record: SAP S/4HANA QM
+    system_of_record: ERP quality module
     target_type: lambda
     inputs:
       - {name: batch_id, type: string, required: true, constraints: "^[A-Z0-9]{10}$"}

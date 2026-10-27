@@ -63,7 +63,7 @@ Never: partition from a tool argument, from a session id, or from a rate-limit b
 ## Q5 — Build, wrap or reuse the server
 
 1. **Reuse** a vendor MCP server only behind the gateway, with a tool allow-list, prompt/resource inventory and capability-drift detection (unknown tools quarantined).
-2. **Wrap** existing APIs as Lambda or OpenAPI targets exposing curated business verbs — the default for ERP systems such as SAP.
+2. **Wrap** existing APIs as Lambda or OpenAPI targets exposing curated business verbs — the default for any system of record that already has an API (ERP, LIMS, MES, PLM, CRM, ITSM, SaaS).
 3. **Build** a custom MCP server on AgentCore Runtime only for stateful sessions, elicitation/sampling, or long-running jobs.
 
 ## Output and reconsideration
