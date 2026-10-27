@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Governance method and paved road for MCP servers on Amazon Bedrock AgentCore Gateway.",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "plugins": [
     {
       "name": "mcp-architect",
       "source": "./",
       "description": "Design a governed MCP server end to end as portable Agent Skills (Claude Code, OpenAI Codex, GitHub Copilot): requirements, governance decision, tool contracts, Cedar policy, AWS AgentCore architecture with draw.io diagrams, CDK deployment and operations.",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "category": "architecture",
       "tags": ["mcp", "aws", "bedrock-agentcore", "governance", "cedar", "drawio", "agent-skills"]
     }

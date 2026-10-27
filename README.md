@@ -13,7 +13,46 @@ Background: the article [Governing MCP in the Enterprise](https://karim-boudich.
 
 ![Lifecycle](docs/diagrams/05-mcp-lifecycle.svg)
 
-The pack is nine [Agent Skills](https://agentskills.io) (`SKILL.md`) plus tested Python scripts. The rules that must not drift live in the scripts, not in any agent's prompt.
+The pack is ten [Agent Skills](https://agentskills.io) (`SKILL.md`) plus tested Python scripts. The rules that must not drift live in the scripts, not in any agent's prompt.
+
+## Central MCP monorepo
+
+The method works best with one repository that holds every MCP server in the organisation. It gives the platform team and the Design Authority one place to see what exists, and it checks every change automatically.
+
+```
+your-mcp-platform/
+  servers/<name>/           one directory per MCP server, whatever system it fronts
+    mcp-spec.yaml           owners, consumers, systems, tools, tiers
+    adr-0001-<name>.md      governance decision
+    infra/                  CDK stack, hardened Cedar policies, adapter, tests
+  CATALOG.md                generated: every server and tool, owners, tiers, check status
+  CODEOWNERS                domain team per server, platform team for governance files
+  vendor/agentcore-mcp-governance/   this repository, pinned as a submodule
+  .github/workflows/mcp-governance.yml
+```
+
+Set it up in an empty repository:
+
+```bash
+git submodule add https://github.com/KBoudich/agentcore-mcp-governance vendor/agentcore-mcp-governance
+python3 vendor/agentcore-mcp-governance/scripts/install.py . --agents codex,copilot,claude \
+  --plugin-path vendor/agentcore-mcp-governance --monorepo
+```
+
+On every pull request and push to `main`:
+
+- **`checks` (the gate, no AI):** `scripts/check_repo.py` checks each changed server:
+  - the spec rules (tiers, identity inputs, idempotency, approvals, Regions);
+  - that a governance ADR exists;
+  - one permit and one break-glass forbid per tool;
+  - no permit for an unknown tool, and no permit that covers every action;
+  - unique server names;
+  - that `CATALOG.md` is current.
+
+  Missing artefacts are warnings while a server is `draft` and errors from `pilot` on. Make this a required status check.
+- **`ai-review` (advisory):** set the repository variable `MCP_AI_REVIEWER` to `claude` or `codex` to have that agent run the `mcp-governance-review` skill on the changed servers and comment on the pull request. For GitHub Copilot code review, enable it with a ruleset; it reads `.github/copilot-instructions.md`.
+
+Engineers get the same checks locally through the `mcp-repo-compliance` skill, before they push.
 
 ## Install
 
@@ -46,7 +85,7 @@ This copies the plugin to `<your-repo>/tools/mcp-architect/` and each skill to `
 | 6 | `mcp-iac-deploy` | CDK project (Gateway, Policy, interceptor, adapter) + GitHub Actions | G5 LOG_ONLY review, smoke test |
 | 7 | `mcp-operations` | runbooks, acceptance tests, go-live checklist | G6 drills, evidence reconstruction |
 
-Plus `design-mcp`, which runs stages 1–7 in order with their gates, and `mcp-governance-review`, an independent GO / CONDITIONAL / NO-GO review. Run the review in a separate context (a Claude Code subagent or a fresh Codex/Copilot session) so the author does not grade their own design.
+Plus `design-mcp`, which runs stages 1–7 in order with their gates; `mcp-repo-compliance`, which runs the repository checks before a commit and keeps the catalogue current; and `mcp-governance-review`, an independent GO / CONDITIONAL / NO-GO review. Run the review in a separate context (a Claude Code subagent or a fresh Codex/Copilot session) so the author does not grade their own design.
 
 ### Scripts (`scripts/`, Python 3.10+, PyYAML for YAML specs)
 
@@ -59,6 +98,7 @@ Plus `design-mcp`, which runs stages 1–7 in order with their gates, and `mcp-g
 | `drawio_kit.py` | tiny builder for native draw.io files with verified `mxgraph.aws4` icons |
 | `export_drawio.sh` | `.drawio` → `.svg` (draw.io desktop CLI, headless with `xvfb-run`) |
 | `scaffold_deploy.py` | spec → CDK project, tool schemas, Cedar policies, decision matrix |
+| `check_repo.py` | monorepo gate: checks every changed server, builds `CATALOG.md`, fails CI on governance errors |
 | `install.py` | vendor the plugin and its skills into a repository for Codex, Copilot and/or Claude Code |
 
 `reference/agentcore-facts.json` holds AgentCore prices, quotas and Region coverage with their verification date (2026-10-21). Re-verify before budgeting.

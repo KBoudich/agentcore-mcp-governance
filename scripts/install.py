@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Install mcp-architect into a repository for any Agent Skills client.
 
-    install.py <repo> [--agents codex,copilot,claude]   (default: codex,copilot)
+    install.py <repo> [--agents codex,copilot,claude] [--plugin-path PATH] [--monorepo]
+
+    --agents        which coding agents to install the skills for (default: codex,copilot)
+    --plugin-path   the pack is already in the repo at PATH (e.g. a submodule at
+                    vendor/agentcore-mcp-governance): do not vendor a copy, point the skills at PATH
+    --monorepo      also lay out a central MCP monorepo: CI workflow, review prompt,
+                    Copilot instructions, CODEOWNERS and servers/README.md (existing files are kept)
 
 Vendors the plugin under <repo>/tools/mcp-architect/ (scripts, skills, reference)
 and copies every skill to the directory each agent scans:
@@ -37,7 +43,7 @@ def _copy(src: str, dst: str) -> None:
         shutil.copy2(src, dst)
 
 
-def _rewrite_plugin_paths(skill_dir: str) -> None:
+def _rewrite_plugin_paths(skill_dir: str, plugin: str) -> None:
     for base, _, files in os.walk(skill_dir):
         for name in files:
             if not name.endswith(REWRITE_EXT):
@@ -50,25 +56,36 @@ def _rewrite_plugin_paths(skill_dir: str) -> None:
             # Drop the line that explains the placeholder; the paths are concrete now.
             lines = [ln for ln in text.splitlines(keepends=True) if not ln.startswith(DEFINITION)]
             with open(path, "w", encoding="utf-8") as fh:
-                fh.write("".join(lines).replace("\n\n\n", "\n\n").replace("<plugin>", VENDOR))
+                fh.write("".join(lines).replace("\n\n\n", "\n\n").replace("<plugin>", plugin))
 
 
-def install(repo: str, agents: list[str]) -> list[str]:
+def install(repo: str, agents: list[str], plugin_path: str | None = None, monorepo: bool = False) -> list[str]:
     unknown = [a for a in agents if a not in SKILL_DIRS]
     if unknown:
         raise ValueError(f"unknown agent(s): {', '.join(unknown)}; choose from {', '.join(SKILL_DIRS)}")
     repo = os.path.abspath(repo)
-    for item in VENDORED:
-        _copy(os.path.join(ROOT, item), os.path.join(repo, VENDOR, item))
+    plugin = (plugin_path or VENDOR).rstrip("/")
+    if plugin_path is None:
+        for item in VENDORED:
+            _copy(os.path.join(ROOT, item), os.path.join(repo, VENDOR, item))
+    written = []
+    if monorepo:
+        template = os.path.join(ROOT, "templates", "monorepo")
+        for base, _, files in os.walk(template):
+            for name in files:
+                src = os.path.join(base, name)
+                dst = os.path.join(repo, os.path.relpath(src, template))
+                if not os.path.exists(dst):
+                    _copy(src, dst)
+                    written.append(os.path.relpath(dst, repo))
     targets = sorted({SKILL_DIRS[a] for a in agents})
     skills = sorted(d for d in os.listdir(os.path.join(ROOT, "skills"))
                     if os.path.isfile(os.path.join(ROOT, "skills", d, "SKILL.md")))
-    written = []
     for target in targets:
         for skill in skills:
             dst = os.path.join(repo, target, skill)
             _copy(os.path.join(ROOT, "skills", skill), dst)
-            _rewrite_plugin_paths(dst)
+            _rewrite_plugin_paths(dst, plugin)
             written.append(os.path.relpath(dst, repo))
     return written
 
@@ -80,12 +97,13 @@ def main(argv: list[str]) -> int:
     agents = ["codex", "copilot"]
     if "--agents" in argv:
         agents = [a.strip() for a in argv[argv.index("--agents") + 1].split(",") if a.strip()]
+    plugin_path = argv[argv.index("--plugin-path") + 1] if "--plugin-path" in argv else None
     try:
-        written = install(argv[0], agents)
+        written = install(argv[0], agents, plugin_path=plugin_path, monorepo="--monorepo" in argv)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    print(f"vendored {VENDOR}/ and {len(written)} skill copies:")
+    print(f"skills point at {plugin_path or VENDOR + '/'}; wrote {len(written)} item(s):")
     for path in written:
         print(f"  {path}")
     if "copilot" in agents and "claude" in agents:

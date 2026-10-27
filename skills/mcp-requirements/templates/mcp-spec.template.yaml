@@ -52,7 +52,7 @@ volume:                         # drives cost model and quota checks
   peak_tps: 0
 
 systems_of_record:
-  - name: ""                    # e.g. SAP S/4HANA QM
+  - name: ""                    # any system of record: ERP, LIMS, MES, PLM, CRM, ITSM, data platform, SaaS API
     location: on-prem           # on-prem | aws | saas
     interface: ""               # odata | rfc | rest | jdbc | graphql | mcp
     data_classes: []            # public | internal | confidential | restricted | personal | export-controlled

@@ -1,0 +1,98 @@
+# Central MCP monorepo: governance checks on every change.
+#
+# - `checks` is the gate: deterministic, no AI, make it a required status check.
+# - `ai-review` is advisory: the mcp-governance-review skill run by the agent named in
+#   the repository variable MCP_AI_REVIEWER (`claude` or `codex`). Unset = skipped.
+#   GitHub Copilot code review needs no job here: enable it with a ruleset; it reads
+#   .github/copilot-instructions.md.
+#
+# Assumes the governance pack is a submodule at vendor/agentcore-mcp-governance.
+name: mcp-governance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  PACK: vendor/agentcore-mcp-governance
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - name: Check changed MCP servers and the catalogue
+        run: |
+          base=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="--base origin/${{ github.base_ref }}"
+          fi
+          python3 "$PACK/scripts/check_repo.py" --root servers $base \
+            --check-catalog CATALOG.md --summary "$GITHUB_STEP_SUMMARY"
+
+  ai-review:
+    if: github.event_name == 'pull_request' && vars.MCP_AI_REVIEWER != ''
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: true
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Prepare review context
+        run: |
+          pip install pyyaml
+          python3 "$PACK/scripts/install.py" . --agents claude,codex --plugin-path "$PACK"
+          git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- servers/ \
+            | cut -d/ -f1-2 | sort -u > changed-servers.txt
+          git diff "origin/${{ github.base_ref }}...HEAD" -- servers/ > review-diff.patch
+          cat changed-servers.txt
+
+      - name: Review with Claude
+        if: vars.MCP_AI_REVIEWER == 'claude'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Follow .github/mcp-review-prompt.md. Write the review to mcp-review.md."
+          claude_args: '--max-turns 30 --allowedTools "Read,Grep,Glob,Write,Bash(git diff:*),Bash(git log:*),Bash(python3:*)"'
+
+      - name: Review with Codex
+        if: vars.MCP_AI_REVIEWER == 'codex'
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/mcp-review-prompt.md
+          output-file: mcp-review.md
+          sandbox: read-only
+
+      - name: Post the review
+        if: hashFiles('mcp-review.md') != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = require('fs').readFileSync('mcp-review.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });

@@ -1,6 +1,6 @@
 {
   "name": "mcp-architect",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Design a governed MCP server from requirements to deployment on AWS (Bedrock AgentCore Gateway): spec intake, governance decision framework, safe tool design, Cedar policy and tests, draw.io architecture, cost model, CDK/CI deployment, runbooks and acceptance tests.",
   "author": {
     "name": "Karim Boudich",
