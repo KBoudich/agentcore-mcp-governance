@@ -1,12 +1,12 @@
 # ADR: Governance and hosting for the `quality-certificates` MCP server
 
-- **Status:** Proposed (example)
+- **Status:** Proposed (2026-10-27)
 - **Domain:** quality · **Business owner:** Head of Quality Systems · **Technical owner:** Quality digital product team · **Risk owner:** Group Quality Director
 - **Highest tool tier:** T3
 
 ## Context
 
-Let customer-service and quality agents retrieve inspection certificates and manage non-conformance reports without SAP screen access.
+Let customer-service and quality agents retrieve inspection certificates and manage non-conformance reports without direct access to the business systems.
 
 Hosting aws, primary Region eu-central-1, IdP entra-id, partition dimension legal_entity, isolation contractual, compliance gdpr, nis2, export-control.
 

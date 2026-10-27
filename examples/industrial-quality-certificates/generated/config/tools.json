@@ -42,7 +42,7 @@
   },
   {
     "name": "create_nonconformance_draft",
-    "description": "Create a DRAFT non-conformance report (not released) for a production order. Returns the draft id. A human must review and release it in SAP.",
+    "description": "Create a DRAFT non-conformance report (not released) for a production order. Returns the draft id. A human must review and release it in the ERP.",
     "inputSchema": {
       "type": "object",
       "properties": {

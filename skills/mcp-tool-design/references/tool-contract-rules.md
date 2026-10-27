@@ -5,7 +5,7 @@
 | Avoid | Prefer | Why |
 | --- | --- | --- |
 | `run_sql(query)` | `list_open_nonconformances(plant_code, page_token)` | Cedar can reason about a plant code; it cannot reason about SQL |
-| `call_sap(service, payload)` | `get_inspection_certificate(order_number, item_number)` | one effect, one owner, one test matrix |
+| `call_erp(service, payload)` | `get_inspection_certificate(order_number, item_number)` | one effect, one owner, one test matrix |
 | `update_po(po)` (full object) | `create_po_draft(...)` + `request_po_approval(po_id, amount)` | authority split by tier |
 | `release_hold(batch)` | `request_quality_hold_release(batch_id, disposition, justification, idempotency_key)` | T3 proposes; humans release |
 

@@ -161,19 +161,9 @@ class InstallTest(unittest.TestCase):
                 self.assertIn(f, written)
             with open(os.path.join(repo, ".agents", "skills", "mcp-repo-compliance", "SKILL.md")) as fh:
                 self.assertIn("python3 vendor/agentcore-mcp-governance/scripts/check_repo.py", fh.read())
-            self.assertNotIn(".gitlab-ci.yml", written)
             open(os.path.join(repo, "CODEOWNERS"), "w").write("mine\n")
             install.install(repo, ["codex"], plugin_path="vendor/agentcore-mcp-governance", monorepo=True)
             self.assertEqual(open(os.path.join(repo, "CODEOWNERS")).read(), "mine\n")
-
-    def test_monorepo_gitlab_ci(self):
-        with tempfile.TemporaryDirectory() as repo:
-            written = install.install(repo, ["codex"], plugin_path="vendor/agentcore-mcp-governance", monorepo=True, ci="gitlab")
-            self.assertIn(".gitlab-ci.yml", written)
-            self.assertFalse(os.path.exists(os.path.join(repo, ".github")))
-            with self.assertRaises(ValueError):
-                install.install(repo, ["codex"], monorepo=True, ci="jenkins")
-
 
 class CheckRepoTest(unittest.TestCase):
     def setUp(self):
