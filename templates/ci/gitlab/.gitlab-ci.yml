@@ -1,0 +1,26 @@
+# Central MCP monorepo: governance gate on every merge request and on the default branch.
+# Make it blocking with "Pipelines must succeed" (Settings → Merge requests).
+# Assumes the governance pack is a submodule at vendor/agentcore-mcp-governance
+# (use a relative submodule URL so the runner can fetch it with the job token).
+
+mcp-governance:
+  image: python:3.12-slim
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    GIT_DEPTH: 0
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git > /dev/null
+    - pip install -q pyyaml
+  script:
+    - |
+      base=""
+      if [ -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then base="--base $CI_MERGE_REQUEST_DIFF_BASE_SHA"; fi
+      python3 vendor/agentcore-mcp-governance/scripts/check_repo.py --root servers $base \
+        --check-catalog CATALOG.md --summary governance-report.md
+  artifacts:
+    when: always
+    expose_as: governance report
+    paths: [governance-report.md]

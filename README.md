@@ -17,7 +17,9 @@ The pack is ten [Agent Skills](https://agentskills.io) (`SKILL.md`) plus tested 
 
 ## Central MCP monorepo
 
-The method works best with one repository that holds every MCP server in the organisation. It gives the platform team and the Design Authority one place to see what exists, and it checks every change automatically.
+The method works best with one repository that holds every MCP server in the organisation: the application code, its infrastructure, and the skills themselves. It gives the platform team and the Design Authority one place to see what exists, and the same gates run on every developer's machine and in CI on every change.
+
+![Where the skills run](docs/diagrams/07-monorepo-gating.svg)
 
 ```
 your-mcp-platform/
@@ -36,10 +38,10 @@ Set it up in an empty repository:
 ```bash
 git submodule add https://github.com/KBoudich/agentcore-mcp-governance vendor/agentcore-mcp-governance
 python3 vendor/agentcore-mcp-governance/scripts/install.py . --agents codex,copilot,claude \
-  --plugin-path vendor/agentcore-mcp-governance --monorepo
+  --plugin-path vendor/agentcore-mcp-governance --monorepo --ci github   # or --ci gitlab
 ```
 
-On every pull request and push to `main`:
+On every pull request (GitHub) or merge request (GitLab), and on every push to the default branch:
 
 - **`checks` (the gate, no AI):** `scripts/check_repo.py` checks each changed server:
   - the spec rules (tiers, identity inputs, idempotency, approvals, Regions);
@@ -49,8 +51,8 @@ On every pull request and push to `main`:
   - unique server names;
   - that `CATALOG.md` is current.
 
-  Missing artefacts are warnings while a server is `draft` and errors from `pilot` on. Make this a required status check.
-- **`ai-review` (advisory):** set the repository variable `MCP_AI_REVIEWER` to `claude` or `codex` to have that agent run the `mcp-governance-review` skill on the changed servers and comment on the pull request. For GitHub Copilot code review, enable it with a ruleset; it reads `.github/copilot-instructions.md`.
+  Missing artefacts are warnings while a server is `draft` and errors from `pilot` on. Make it blocking: a required status check on GitHub, "Pipelines must succeed" on GitLab.
+- **`ai-review` (advisory, GitHub template):** set the repository variable `MCP_AI_REVIEWER` to `claude` or `codex` to have that agent run the `mcp-governance-review` skill on the changed servers and comment on the pull request. For GitHub Copilot code review, enable it with a ruleset; it reads `.github/copilot-instructions.md`.
 
 Engineers get the same checks locally through the `mcp-repo-compliance` skill, before they push.
 

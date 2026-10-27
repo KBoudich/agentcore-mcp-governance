@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Install mcp-architect into a repository for any Agent Skills client.
 
-    install.py <repo> [--agents codex,copilot,claude] [--plugin-path PATH] [--monorepo]
+    install.py <repo> [--agents codex,copilot,claude] [--plugin-path PATH] [--monorepo [--ci github|gitlab]]
 
     --agents        which coding agents to install the skills for (default: codex,copilot)
     --plugin-path   the pack is already in the repo at PATH (e.g. a submodule at
                     vendor/agentcore-mcp-governance): do not vendor a copy, point the skills at PATH
-    --monorepo      also lay out a central MCP monorepo: CI workflow, review prompt,
-                    Copilot instructions, CODEOWNERS and servers/README.md (existing files are kept)
+    --monorepo      also lay out a central MCP monorepo: CODEOWNERS, servers/README.md and the
+                    CI gate for --ci github (default: workflow, AI review prompt, Copilot
+                    instructions) or --ci gitlab (.gitlab-ci.yml). Existing files are kept.
 
 Vendors the plugin under <repo>/tools/mcp-architect/ (scripts, skills, reference)
 and copies every skill to the directory each agent scans:
@@ -59,7 +60,8 @@ def _rewrite_plugin_paths(skill_dir: str, plugin: str) -> None:
                 fh.write("".join(lines).replace("\n\n\n", "\n\n").replace("<plugin>", plugin))
 
 
-def install(repo: str, agents: list[str], plugin_path: str | None = None, monorepo: bool = False) -> list[str]:
+def install(repo: str, agents: list[str], plugin_path: str | None = None, monorepo: bool = False,
+            ci: str = "github") -> list[str]:
     unknown = [a for a in agents if a not in SKILL_DIRS]
     if unknown:
         raise ValueError(f"unknown agent(s): {', '.join(unknown)}; choose from {', '.join(SKILL_DIRS)}")
@@ -70,14 +72,16 @@ def install(repo: str, agents: list[str], plugin_path: str | None = None, monore
             _copy(os.path.join(ROOT, item), os.path.join(repo, VENDOR, item))
     written = []
     if monorepo:
-        template = os.path.join(ROOT, "templates", "monorepo")
-        for base, _, files in os.walk(template):
-            for name in files:
-                src = os.path.join(base, name)
-                dst = os.path.join(repo, os.path.relpath(src, template))
-                if not os.path.exists(dst):
-                    _copy(src, dst)
-                    written.append(os.path.relpath(dst, repo))
+        if ci not in ("github", "gitlab"):
+            raise ValueError(f"unknown CI: {ci}; choose github or gitlab")
+        for template in (os.path.join(ROOT, "templates", "monorepo"), os.path.join(ROOT, "templates", "ci", ci)):
+            for base, _, files in os.walk(template):
+                for name in files:
+                    src = os.path.join(base, name)
+                    dst = os.path.join(repo, os.path.relpath(src, template))
+                    if not os.path.exists(dst):
+                        _copy(src, dst)
+                        written.append(os.path.relpath(dst, repo))
     targets = sorted({SKILL_DIRS[a] for a in agents})
     skills = sorted(d for d in os.listdir(os.path.join(ROOT, "skills"))
                     if os.path.isfile(os.path.join(ROOT, "skills", d, "SKILL.md")))
@@ -99,7 +103,8 @@ def main(argv: list[str]) -> int:
         agents = [a.strip() for a in argv[argv.index("--agents") + 1].split(",") if a.strip()]
     plugin_path = argv[argv.index("--plugin-path") + 1] if "--plugin-path" in argv else None
     try:
-        written = install(argv[0], agents, plugin_path=plugin_path, monorepo="--monorepo" in argv)
+        ci = argv[argv.index("--ci") + 1] if "--ci" in argv else "github"
+        written = install(argv[0], agents, plugin_path=plugin_path, monorepo="--monorepo" in argv, ci=ci)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
